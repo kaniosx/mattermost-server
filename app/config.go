@@ -406,6 +406,7 @@ func (a *App) GetEnvironmentConfig(filter func(reflect.StructField) bool) map[st
 
 // SaveConfig replaces the active configuration, optionally notifying cluster peers.
 func (s *Server) SaveConfig(newCfg *model.Config, sendConfigChangeClusterMessage bool) *model.AppError {
+	// TODO: pass a flag or something
 	oldCfg, err := s.configStore.Set(newCfg)
 	if errors.Cause(err) == config.ErrReadOnlyConfiguration {
 		return model.NewAppError("saveConfig", "ent.cluster.save_config.error", nil, err.Error(), http.StatusForbidden)
@@ -429,6 +430,8 @@ func (s *Server) SaveConfig(newCfg *model.Config, sendConfigChangeClusterMessage
 		if err != nil {
 			return err
 		}
+
+		s.configStore.Broadcast(oldCfg, newCfg)
 	}
 
 	return nil

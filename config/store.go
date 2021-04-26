@@ -201,14 +201,14 @@ func (s *Store) Set(newCfg *model.Config) (*model.Config, error) {
 		return nil, errors.Wrap(err, "failed to persist")
 	}
 
-	if err := s.loadLockedWithOld(oldCfg, &unlockOnce); err != nil {
+	if err := s.loadLockedWithOld(oldCfg, &unlockOnce, false); err != nil {
 		return nil, errors.Wrap(err, "failed to load on save")
 	}
 
 	return oldCfg, nil
 }
 
-func (s *Store) loadLockedWithOld(oldCfg *model.Config, unlockOnce *sync.Once) error {
+func (s *Store) loadLockedWithOld(oldCfg *model.Config, unlockOnce *sync.Once, broadcast bool) error {
 	configBytes, err := s.backingStore.Load()
 	if err != nil {
 		return err
@@ -288,11 +288,18 @@ func (s *Store) loadLockedWithOld(oldCfg *model.Config, unlockOnce *sync.Once) e
 
 	unlockOnce.Do(s.configLock.Unlock)
 
-	if hasChanged {
+	if hasChanged && broadcast {
 		s.invokeConfigListeners(oldCfg, loadedConfig)
 	}
 
 	return nil
+}
+
+func (s *Store) Broadcast(old, new *model.Config) {
+	// s.configLock.Lock()
+	// defer s.configLock.Unlock()
+
+	s.invokeConfigListeners(old, new)
 }
 
 // Load updates the current configuration from the backing store, possibly initializing.
@@ -303,7 +310,7 @@ func (s *Store) Load() error {
 
 	oldCfg := s.config.Clone()
 
-	return s.loadLockedWithOld(oldCfg, &unlockOnce)
+	return s.loadLockedWithOld(oldCfg, &unlockOnce, true)
 }
 
 // GetFile fetches the contents of a previously persisted configuration file.
